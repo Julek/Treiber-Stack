@@ -1,0 +1,11 @@
+Name:		Treiber
+Version:	0.0.1
+Cabal-Version:  >= 1.2
+License:	BSD3
+Author:		Julian Sutherland
+Category:	Data
+Synopsis:	Lock free Treiber stack
+
+Library
+  Build-Depends:	base, ghc-prim, monad-loops, ref-mtl
+  Exposed-modules:      Data.NonBlocking.LockFree.Treiber
