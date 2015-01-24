@@ -8,14 +8,15 @@ Maintainer  : Julian Sutherland (julian.sutherland10@imperial.ac.uk)
 
 An implementation of Treiber stacks, a lock free stack. Works with any monad that has atomically modificable references.
 -}
-module Data.NonBlocking.LockFree.Treiber(TreiberStack(), newTreiberStack, pushTreiberStack, popTreiberStack) where
+
+module Data.NonBlocking.LockFree.Treiber(TreiberStack(), TreiberStackIO, TreiberStackSTM, newTreiberStack, pushTreiberStack, popTreiberStack) where
 
 import Control.Concurrent.STM (STM())
 import Control.Concurrent.STM.TVar (TVar())
 import Control.Monad(join, when)
 import Control.Monad.Loops(whileM_)
-import Control.Monad.Ref
-import Data.IORef
+import Control.Monad.Ref(MonadAtomicRef, newRef, readRef, writeRef, atomicModifyRef)
+import Data.IORef(IORef)
 import GHC.Exts (Int(I#))
 import GHC.Prim (reallyUnsafePtrEquality#)
 
@@ -72,6 +73,8 @@ popTreiberStack (TreiberStack x) = do
         when suc $ writeRef ret (Just elem)
   readRef ret
 
+{-# SPECIALIZE cas :: IORef Integer -> Integer -> Integer -> IO Bool   #-}
+{-# SPECIALIZE cas :: TVar Integer -> Integer -> Integer -> STM Bool   #-}
 cas :: (MonadAtomicRef r m, Eq a) => r a -> a -> a -> m Bool
 cas ref comp rep = atomicModifyRef ref (\val -> let b = val == comp in (if b then rep else val, b))
 
