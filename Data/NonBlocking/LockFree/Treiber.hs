@@ -20,31 +20,31 @@ import Data.IORef(IORef)
 import GHC.Exts (Int(I#))
 import GHC.Prim (reallyUnsafePtrEquality#)
 
--- |TreiberStack inside the IO Monad.
+-- |TreiberStack inside the 'IO' 'Monad'.
 type TreiberStackIO a = TreiberStack IORef a
--- |TreiberStack inside the STM Monad.
+-- |TreiberStack inside the 'STM' 'Monad'.
 type TreiberStackSTM a = TreiberStack TVar a
 
--- |A Lock-free concurrent Treiber stack usable in any monad, m, that is paired with a reference type, r, by an instance of 'MonadAtomicRef'. Can use Specializations TreiberStackIO and TreiberStackSTM
+-- |A lock-free concurrent Treiber stack usable in any 'Monad', m, that is paired with a reference type, r, by an instance of 'MonadAtomicRef'. Can use Specializations 'TreiberStackIO' and 'TreiberStackSTM'.
 data TreiberStack r a = TreiberStack (r (TreiberElem r a))
 data TreiberElem r a = TreiberElem a (r (TreiberElem r a)) | End
 
-instance (Eq a) => Eq (TreiberElem r a) where
+instance Eq (TreiberElem r a) where
   End == End = True
-  (TreiberElem x rest1) == (TreiberElem y rest2) = (x == y) && (ptrEq rest1 rest2)
+  (TreiberElem x rest1) == (TreiberElem y rest2) = (ptrEq rest1 rest2)
 
-{-# SPECIALIZE newTreiberStack :: (Eq a) => IO (TreiberStackIO a) #-}
-{-# SPECIALIZE newTreiberStack :: (Eq a) => STM (TreiberStackSTM a) #-}
--- |Creates a new empty instance of the 'TreiberStack'. Internally implemented with a reference of type r, which is why they must be atomically modifiable.
-newTreiberStack :: (MonadAtomicRef r m, Eq a) => m (TreiberStack r a)
+{-# SPECIALIZE newTreiberStack :: IO (TreiberStackIO a) #-}
+{-# SPECIALIZE newTreiberStack :: STM (TreiberStackSTM a) #-}
+-- |Creates a new empty instance of the 'TreiberStack'. Internally implemented with a reference of type r, which is why they must be atomically modifiable. Initially empty.
+newTreiberStack :: (MonadAtomicRef r m) => m (TreiberStack r a)
 newTreiberStack = do
   ref <- newRef End
   return (TreiberStack ref)
 
-{-# SPECIALIZE pushTreiberStack :: (Eq a) => TreiberStackIO a -> a -> IO () #-}
-{-# SPECIALIZE pushTreiberStack :: (Eq a) => TreiberStackSTM a -> a -> STM () #-}
--- |Pushes an element on to a Treiber stack.
-pushTreiberStack :: (MonadAtomicRef r m, Eq a) => TreiberStack r a -> a -> m ()
+{-# SPECIALIZE pushTreiberStack :: TreiberStackIO a -> a -> IO () #-}
+{-# SPECIALIZE pushTreiberStack :: TreiberStackSTM a -> a -> STM () #-}
+-- |Pushes an element on to a 'TreiberStack' in a lock-free manner.
+pushTreiberStack :: (MonadAtomicRef r m) => TreiberStack r a -> a -> m ()
 pushTreiberStack (TreiberStack x) v = do
   let partConstr = TreiberElem v
   b <- newRef False
@@ -54,10 +54,10 @@ pushTreiberStack (TreiberStack x) v = do
     suc <- cas x z (partConstr res)
     writeRef b suc
 
-{-# SPECIALIZE popTreiberStack :: (Eq a) => TreiberStackIO a -> IO (Maybe a) #-}
-{-# SPECIALIZE popTreiberStack :: (Eq a) => TreiberStackSTM a -> STM (Maybe a) #-}
--- |Pops an element of a Treiber stack. Returns 'Nothing' if the stack is empty.
-popTreiberStack :: (MonadAtomicRef r m, Eq a) => TreiberStack r a -> m (Maybe a)
+{-# SPECIALIZE popTreiberStack :: TreiberStackIO a -> IO (Maybe a) #-}
+{-# SPECIALIZE popTreiberStack :: TreiberStackSTM a -> STM (Maybe a) #-}
+-- |Pops an element of a 'TreiberStack' in a lock-free manner. Returns 'Nothing' if the stack is empty.
+popTreiberStack :: (MonadAtomicRef r m) => TreiberStack r a -> m (Maybe a)
 popTreiberStack (TreiberStack x) = do
   b <- newRef False
   ret <- newRef Nothing
@@ -73,8 +73,8 @@ popTreiberStack (TreiberStack x) = do
         when suc $ writeRef ret (Just elem)
   readRef ret
 
-{-# SPECIALIZE cas :: IORef Integer -> Integer -> Integer -> IO Bool   #-}
-{-# SPECIALIZE cas :: TVar Integer -> Integer -> Integer -> STM Bool   #-}
+{-# SPECIALIZE cas :: (Eq a) => IORef a -> a -> a -> IO Bool #-}
+{-# SPECIALIZE cas :: (Eq a) => TVar a -> a -> a -> STM Bool #-}
 cas :: (MonadAtomicRef r m, Eq a) => r a -> a -> a -> m Bool
 cas ref comp rep = atomicModifyRef ref (\val -> let b = val == comp in (if b then rep else val, b))
 
